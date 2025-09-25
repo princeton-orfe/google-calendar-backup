@@ -19,11 +19,18 @@ function backupCalendarsFromSheet() {
 
   data.forEach(row => {
     const calendarName = row[0];
-    const icsUrl = row[1];
+    const icsUrl = (row[1] || "").toString().trim();
     const sanitizedCalendarName = calendarName.replace(/[^a-zA-Z0-9_-]/g, "_");
 
     if (!calendarName || !icsUrl) {
       log += `⚠️ Missing data for one row. Skipping row with Calendar Name: '${calendarName}'.\n`;
+      failureCount++;
+      return;
+    }
+
+    // Validate Google Calendar ICS URL shape
+    if (!isValidGoogleCalendarIcsUrl(icsUrl)) {
+      log += `⚠️ Invalid Google Calendar ICS URL for '${calendarName}'. Skipping this row.\n`;
       failureCount++;
       return;
     }
@@ -68,6 +75,28 @@ Set them in Apps Script: Project Settings > Script properties (or File > Project
   }
 
   return { sheetId, sheetTabName, backupFolderName };
+}
+
+/**
+ * Utility: Log resolved configuration for sanity checks.
+ * Call manually from the Apps Script editor to verify configuration.
+ */
+function logResolvedConfiguration() {
+  const { sheetId, sheetTabName, backupFolderName } = getConfigOrThrow();
+  Logger.log(`SHEET_ID: ${sheetId}`);
+  Logger.log(`SHEET_TAB_NAME: ${sheetTabName}`);
+  Logger.log(`BACKUP_FOLDER_NAME: ${backupFolderName}`);
+}
+
+/**
+ * Basic validator to check whether a URL looks like a Google Calendar ICS link.
+ * Accepts hosts calendar.google.com or www.google.com and paths under /calendar/ical/.../basic.ics
+ */
+function isValidGoogleCalendarIcsUrl(url) {
+  if (!url || typeof url !== "string") return false;
+  const trimmed = url.trim();
+  const re = /^https:\/\/(calendar\.google\.com|www\.google\.com)\/calendar\/ical\/.+\/basic\.ics(?:\?.*)?$/i;
+  return re.test(trimmed);
 }
 
 function getOrCreateFolder(folderName, parentFolder = DriveApp) {
